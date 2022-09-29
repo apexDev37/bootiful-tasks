@@ -1,0 +1,6 @@
+app:
+  datasource:
+    jdbc-url: jdbc:postgresql://localhost:5432/tasktrackerdb
+    username: postgres
+    password: postgres-admin
+    pool-size: 30

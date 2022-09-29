@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Task Tracker</title>
+
+    <!-- Include required files -->
+    <link th:href="@{/css/main.css}" rel="stylesheet" type="text/css" />
+    <link th:href="@{/font-awesome/font-awesome.min.css}" rel="stylesheet">
+    <script th:src="@{/js/vue.js}" rel="script" type="text/javascript"></script>
+    <script th:src="@{/assets/axios.min.js}" rel="script" type="text/javascript"></script>
+    <script src="https://kit.fontawesome.com/88227a6ea0.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+    <div id="app">
+        <!-- Header for the Task Tracker home page -->
+        <div class="container">
+            <header>
+                <h1>{{ appTitle }}</h1>
+                <button
+                        ref="addTaskBtn"
+                        class="btn"
+                        @click="clearTaskForm(); toggleAddTaskForm('Add Task')"
+                >Add Task</button>
+            </header>
+
+            <!-- Tasks form for user input and post operation -->
+            <form v-show="addTaskVisible" @submit.prevent="onSubmitForm" class="add-form">
+                <div class="form-control">
+                    <label>Task</label>
+                    <input
+                            ref="inputTaskText"
+                            type="text"
+                            name="text"
+                            v-model="text"
+                            placeholder="Add Description"
+                    />
+                </div>
+
+                <div class="form-control">
+                    <label>Day & Time</label>
+                    <input
+                            ref="inputTaskDay"
+                            type="text"
+                            name="day"
+                            v-model="day"
+                            placeholder="Add Day & Time"
+                    />
+                </div>
+
+                <div class="form-control form-control-check">
+                    <label>Set Reminder</label>
+                    <input
+                            ref="inputTaskReminder"
+                            type="checkbox"
+                            name="reminder"
+                            v-model="reminder"
+                    />
+                </div>
+                <input
+                        type="submit"
+                       class="btn btn-block"
+                       :value="formSubmitBtnValue"
+                />
+            </form>
+
+            <!-- List of Tasks displayed on the home page -->
+            <div v-show="showTaskItems" v-for="task in taskItems" :key="task.taskId">
+                <!-- Individual Task displayed on the home page -->
+                <div @dblclick="toggleReminder(task)"
+                     :class="[task.taskReminderOn ? 'reminder' : '', 'task']"
+                >
+                    <h4>
+                        {{ task.taskTitle }}
+                        <i @click="deleteTaskItem(task.taskId)" name="deleteTaskIcon" class="fa fa-times"></i>
+                    </h4>
+                    <p>
+                        {{ task.taskDueDateAndTime }}
+                        <i @click="updateTaskPreHandler(task)" name="updateTaskIcon" class="fa fa-pen-to-square"></i>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Footer for the Task Tracker home page -->
+            <footer>
+                <p>Copyright &copy; 2022</p>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:8080/api/v1/task';
+        var app = new Vue({
+            el: '#app',
+            data: {
+                appTitle: 'Task Tracker',
+                tasks: [],
+                taskToUpdate: {},
+                addTaskVisible: false,
+                formSubmitBtnValue: 'Add Task',
+                text: '',
+                day: '',
+                reminder: false
+            },
+            computed: {
+                taskItems: function () {
+                    return this.tasks
+                },
+                showTaskItems: function () {
+                    return !(this.addTaskVisible
+                        && this.formSubmitBtnValue === 'Update Task');
+                },
+                taskToBeUpdated: function () {
+                    return this.taskToUpdate
+                }
+            },
+            methods: {
+                toggleAddTaskForm: function(formBtnValue) {
+                    this.formSubmitBtnValue = formBtnValue
+                    this.addTaskVisible = !this.addTaskVisible
+                    this.$refs.addTaskBtn.innerHTML
+                        = this.addTaskVisible?  'Close' : 'Add Task'
+                    this.$refs.addTaskBtn.style.backgroundColor
+                        = this.addTaskVisible?  'black' : '#155e81'
+                },
+                getTaskItems: async () => {
+                    try {
+                        const response = await axios.get(`${BASE_URL}`)
+                        const taskItems = response.data
+
+                        console.log(`GET: getTaskItems \n`, taskItems)
+                        return taskItems
+                    } catch (errors) {
+                        console.log(errors)
+                    }
+                },
+                getTaskItem: async (taskId) => {
+                    try {
+                        const response = await axios.get(`${BASE_URL}/${taskId}`)
+                        const taskItem = response.data
+
+                        console.log(`GET: getTaskItem \n`, taskItem)
+                        return taskItem
+                    } catch (errors) {
+                        console.log(errors)
+                    }
+                },
+                addTaskItem: async (newTask) => {
+                    try {
+                        const response = await axios.post(`${BASE_URL}`, newTask)
+                        const newlyAddedTaskItem = response.data
+
+                        console.log(`POST: addTaskItem \n`, newlyAddedTaskItem)
+                        return newlyAddedTaskItem
+                    } catch (errors) {
+                        console.log(errors)
+                    }
+                },
+                onSubmitForm: async function () {
+                    const newTask = {
+                        taskTitle: this.text,
+                        taskDueDateAndTime: this.day,
+                        taskReminderOn: this.reminder
+                    }
+
+                    if (this.formSubmitBtnValue === 'Add Task') {
+                        const newlyAddedTask = await this.addTaskItem(newTask);
+                    } else if (this.formSubmitBtnValue === 'Update Task') {
+                        const newlyEditedTask = await this.updateTaskItem(newTask)
+                    }
+
+                    // base procedures required after adding or updating a task
+                    this.clearTaskForm()
+                    this.toggleAddTaskForm('Add Task')
+                    this.tasks = await this.getTaskItems()
+                },
+                clearTaskForm: function() {
+                    this.text = ''
+                    this.day = ''
+                    this.reminder = ''
+                },
+                updateTaskItem: async function (updatedTask) {
+                    try {
+                        const { taskId } = this.taskToUpdate
+                        console.log(`Task to update Id: ${taskId}`)
+                        const response = await axios.put(`${BASE_URL}/${taskId}`, updatedTask);
+                        if (response.status === 200)
+                            console.log(`PUT: updateTaskItem \n`, updatedTask)
+                        return updatedTask
+                    } catch (errors) {
+                        console.log(errors)
+                    }
+                },
+                updateTaskPreHandler: function (taskToUpdate) {
+                    this.taskToUpdate = taskToUpdate
+                    this.populateFormWithTaskToUpdate(taskToUpdate)
+                    this.toggleAddTaskForm('Update Task')
+                },
+                populateFormWithTaskToUpdate: function (taskToUpdate) {
+                    this.text = taskToUpdate.taskTitle
+                    this.day = taskToUpdate.taskDueDateAndTime
+                    this.reminder = taskToUpdate.taskReminderOn
+                },
+                deleteTaskItem: async function(taskId)  {
+                    if (confirm('Are you sure you want to delete?')) {
+                        try {
+                            const taskToDelete = await this.getTaskItem(taskId);
+                            const response = await axios.delete(`${BASE_URL}/${taskId}`)
+
+                            if (response.status === 200) {
+                                console.log(`DELETE: deleteTaskItem \n`, taskToDelete)
+
+                                this.tasks =
+                                    this.tasks
+                                        .filter(task =>
+                                            task.taskId !== taskId)
+                            }
+                        } catch (errors) {
+                            console.log(errors)
+                        }
+                    }
+                },
+                toggleReminder: async function (taskToToggleReminder) {
+                    // TODO: persist toggled reminder changes to postgres
+
+                    // retrieve the entire task object
+                    this.taskToUpdate = taskToToggleReminder
+                    const toggledTaskItem
+                        = {...taskToToggleReminder, taskReminderOn: !taskToToggleReminder.taskReminderOn}
+                    const newlyToggledTaskItem = await this.updateTaskItem(toggledTaskItem)
+                    this.tasks = await this.getTaskItems()
+                },
+            },
+            async created() {
+                // on created - fetch tasks and assign to tasks
+                this.tasks = await this.getTaskItems()
+            }
+        });
+    </script>
+</body>
+</html>
